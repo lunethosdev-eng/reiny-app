@@ -14,10 +14,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: npm
 
       - name: Install deps
-        run: npm ci || npm install
+        run: npm install
 
       - name: Setup Java
         uses: actions/setup-java@v4
@@ -27,32 +26,3 @@ jobs:
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
-
-      - name: Add Android platform if missing
-        run: |
-          if [ ! -d android ]; then
-            npx cap add android
-          fi
-          npx cap sync android
-
-      - name: Copy launcher icons
-        run: |
-          if [ -d res ]; then
-            for dens in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
-              mkdir -p android/app/src/main/res/mipmap-$dens
-              cp -f res/mipmap-$dens/ic_launcher.png android/app/src/main/res/mipmap-$dens/ic_launcher.png 2>/dev/null || true
-              cp -f res/mipmap-$dens/ic_launcher.png android/app/src/main/res/mipmap-$dens/ic_launcher_round.png 2>/dev/null || true
-            done
-          fi
-
-      - name: Build debug APK
-        working-directory: android
-        run: chmod +x gradlew && ./gradlew assembleDebug --no-daemon
-
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: reiny-debug-apk
-          path: android/app/build/outputs/apk/debug/*.apk
-          if-no-files-found: error
-
