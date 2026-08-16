@@ -27,6 +27,16 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
+      - name: Prepare www folder and fix webDir
+        run: |
+          mkdir -p www
+          cp index.html app.js style.css manifest.json sw.js www/ 2>/dev/null || true
+          cp *.png *.jpg www/ 2>/dev/null || true
+          cp -r avatars banners www/ 2>/dev/null || true
+          # Cambiar webDir de "." a "www"
+          sed -i 's/"webDir": *"."/"webDir": "www"/' capacitor.config.json
+          cat capacitor.config.json
+
       - name: Add Android platform if missing
         run: |
           if [ ! -d android ]; then
