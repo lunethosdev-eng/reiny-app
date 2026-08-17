@@ -27,7 +27,21 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Add Android platform if missing
+      - name: Prepare webDir (www)
+        run: |
+          rm -rf www
+          mkdir -p www
+          for f in index.html app.js style.css sw.js manifest.json \
+                   icon-192.png icon-512.png icon-48.png \
+                   favicon-32.png favicon-48.png apple-touch-icon.png; do
+            if [ -f "$f" ]; then cp -f "$f" www/; fi
+          done
+          if [ -d avatars ]; then cp -a avatars www/; fi
+          if [ -d banners ]; then cp -a banners www/; fi
+          test -f www/index.html || (echo "FALTA index.html en www" && exit 1)
+          echo "www listo:" && ls -la www
+
+      - name: Add Android platform and sync
         run: |
           if [ ! -d android ]; then
             npx cap add android
@@ -40,36 +54,32 @@ jobs:
         run: |
           mkdir -p android/app
           if [ -n "$GOOGLE_SERVICES_JSON" ]; then
-            echo "$GOOGLE_SERVICES_JSON" > android/app/google-services.json
+            printf '%s\n' "$GOOGLE_SERVICES_JSON" > android/app/google-services.json
             echo "OK: google-services.json desde secret"
           elif [ -f google-services.json ]; then
             cp google-services.json android/app/google-services.json
             echo "OK: google-services.json desde repo"
           else
-            echo "AVISO: sin google-services.json — FCM no funcionará"
+            echo "AVISO: sin google-services.json"
           fi
 
       - name: Wire Google Services Gradle plugin
         run: |
-          if [ -f android/build.gradle ]; then
-            if ! grep -q 'com.google.gms:google-services' android/build.gradle; then
-              python3 << 'PY'
+          if [ -f android/build.gradle ] && ! grep -q 'com.google.gms:google-services' android/build.gradle; then
+            python3 -c "
           from pathlib import Path
-          p = Path('android/build.gradle')
-          t = p.read_text()
-          if 'com.google.gms:google-services' not in t:
-              lines = t.splitlines()
-              out = []
-              inserted = False
-              for line in lines:
-                  out.append(line)
-                  if (not inserted) and 'classpath' in line and 'com.android.tools.build:gradle' in line:
-                      out.append("        classpath 'com.google.gms:google-services:4.5.0'")
-                      inserted = True
-              p.write_text('\n'.join(out) + '\n')
-              print('classpath added' if inserted else 'pattern not found')
-          PY
-            fi
+          p=Path('android/build.gradle')
+          lines=p.read_text().splitlines()
+          out=[]
+          done=False
+          for line in lines:
+              out.append(line)
+              if (not done) and 'classpath' in line and 'com.android.tools.build:gradle' in line:
+                  out.append(\"        classpath 'com.google.gms:google-services:4.5.0'\")
+                  done=True
+          p.write_text(chr(10).join(out)+chr(10))
+          print('classpath', 'ok' if done else 'skip')
+          "
           fi
           if [ -f android/app/build.gradle ]; then
             if ! grep -q 'com.google.gms.google-services' android/app/build.gradle; then
@@ -77,19 +87,15 @@ jobs:
               echo "apply plugin: 'com.google.gms.google-services'" >> android/app/build.gradle
             fi
             if ! grep -q 'firebase-bom' android/app/build.gradle; then
-              python3 << 'PY'
+              python3 -c "
           from pathlib import Path
-          p = Path('android/app/build.gradle')
-          t = p.read_text()
+          p=Path('android/app/build.gradle')
+          t=p.read_text()
           if 'firebase-bom' not in t and 'dependencies {' in t:
-              t = t.replace(
-                  'dependencies {',
-                  "dependencies {\n    implementation platform('com.google.firebase:firebase-bom:34.17.0')\n    implementation 'com.google.firebase:firebase-messaging'",
-                  1
-              )
+              t=t.replace('dependencies {', \"dependencies {\\n    implementation platform('com.google.firebase:firebase-bom:34.17.0')\\n    implementation 'com.google.firebase:firebase-messaging'\", 1)
               p.write_text(t)
-              print('firebase deps added')
-          PY
+              print('firebase deps ok')
+          "
             fi
           fi
 
