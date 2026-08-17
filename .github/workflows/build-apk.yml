@@ -14,9 +14,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: npm
 
       - name: Install deps
-        run: npm install
+        run: npm ci || npm install
 
       - name: Setup Java
         uses: actions/setup-java@v4
@@ -27,22 +28,98 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Prepare www folder and fix webDir
-        run: |
-          mkdir -p www
-          cp index.html app.js style.css manifest.json sw.js www/ 2>/dev/null || true
-          cp *.png *.jpg www/ 2>/dev/null || true
-          cp -r avatars banners www/ 2>/dev/null || true
-          # Cambiar webDir de "." a "www"
-          sed -i 's/"webDir": *"."/"webDir": "www"/' capacitor.config.json
-          cat capacitor.config.json
-
       - name: Add Android platform if missing
         run: |
           if [ ! -d android ]; then
             npx cap add android
           fi
           npx cap sync android
+
+      - name: Inject google-services.json (FCM)
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          mkdir -p android/app
+          if [ -n "$GOOGLE_SERVICES_JSON" ]; then
+            echo "$GOOGLE_SERVICES_JSON" > android/app/google-services.json
+            echo "OK: google-services.json desde secret"
+          elif [ -f google-services.json ]; then
+            cp google-services.json android/app/google-services.json
+            echo "OK: google-services.json desde repo"
+          else
+            echo "AVISO: sin google-services.json — FCM no funcionará"
+          fi
+          if [ -f android/app/google-services.json ]; then
+            python3 -c "import json; d=json.load(open('android/app/google-services.json')); print('package=', d['client'][0]['client_info']['android_client_info']['package_name'])"
+          fi
+
+      - name: Wire Google Services Gradle plugin
+        run: |
+          # Root build.gradle (Groovy, Capacitor)
+          if [ -f android/build.gradle ]; then
+            if ! grep -q 'com.google.gms:google-services' android/build.gradle; then
+              # Insert classpath inside buildscript.dependencies
+              python3 << 'PY'
+          from pathlib import Path
+          p = Path('android/build.gradle')
+          t = p.read_text()
+          if 'com.google.gms:google-services' not in t:
+              # Capacitor typical structure
+              needle = 'classpath \'com.android.tools.build:gradle'
+              if needle in t:
+                  # add after first classpath line in dependencies
+                  lines = t.splitlines()
+                  out = []
+                  inserted = False
+                  for line in lines:
+                      out.append(line)
+                      if (not inserted) and 'classpath' in line and 'com.android.tools.build:gradle' in line:
+                          out.append('        classpath \'com.google.gms:google-services:4.5.0\'')
+                          inserted = True
+                  if not inserted:
+                      # fallback: append to end of buildscript dependencies block is hard; append file apply
+                      out.append('')
+                      out.append('// FCM')
+                      out.append('buildscript { dependencies { classpath \'com.google.gms:google-services:4.5.0\' } }')
+                  p.write_text('\n'.join(out) + '\n')
+                  print('root build.gradle: classpath added')
+              else:
+                  print('root build.gradle: pattern not found, will rely on plugins block if any')
+          PY
+            else
+              echo "root build.gradle ya tiene google-services"
+            fi
+          fi
+
+          # app/build.gradle
+          if [ -f android/app/build.gradle ]; then
+            if ! grep -q 'com.google.gms.google-services' android/app/build.gradle; then
+              echo '' >> android/app/build.gradle
+              echo 'apply plugin: \'com.google.gms.google-services\'' >> android/app/build.gradle
+              echo "app/build.gradle: apply plugin añadido"
+            else
+              echo "app/build.gradle ya tiene plugin"
+            fi
+            # Firebase BoM + messaging (por si el plugin de Capacitor no lo mete todo)
+            if ! grep -q 'firebase-bom' android/app/build.gradle; then
+              python3 << 'PY'
+          from pathlib import Path
+          p = Path('android/app/build.gradle')
+          t = p.read_text()
+          if 'firebase-bom' not in t:
+              # insert inside dependencies { }
+              marker = 'dependencies {'
+              idx = t.find(marker)
+              if idx >= 0:
+                  insert = marker + '\n    implementation platform(\'com.google.firebase:firebase-bom:34.17.0\')\n    implementation \'com.google.firebase:firebase-messaging\''
+                  t = t.replace(marker, insert, 1)
+                  p.write_text(t)
+                  print('firebase deps added')
+              else:
+                  print('dependencies block not found')
+          PY
+            fi
+          fi
 
       - name: Copy launcher icons
         run: |
