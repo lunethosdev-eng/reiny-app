@@ -48,5 +48,15 @@ create policy "tokens_own" on public.device_tokens
   for all using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
 
--- Activa Realtime para calls:
--- Database → Replication → supabase_realtime → habilitar tabla "calls"
+-- OBLIGATORIO para que las llamadas lleguen en tiempo real:
+-- 1) Supabase → Database → Replication → habilita la tabla "calls"
+--    (o Table Editor → calls → ⋮ → Enable Realtime)
+-- 2) Ejecuta también:
+ALTER TABLE public.calls REPLICA IDENTITY FULL;
+
+-- Cómo funcionan las llamadas ahora (v0.2.1):
+-- • Realtime (INSERT en calls) + sondeo cada 2 segundos de respaldo
+-- • Si la app está en segundo plano (no cerrada), muestra notificación del sistema
+--   y el tono sintético cuando vuelves / cuando el SO lo permite
+-- • Ambos usuarios deben tener la app abierta o minimizada (proceso vivo)
+-- • Si cierras la app por completo, hace falta Push (FCM) — tabla device_tokens lista
