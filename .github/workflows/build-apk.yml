@@ -29,24 +29,20 @@ jobs:
 
       - name: Prepare web assets (www)
         run: |
-          # Crear carpeta www y copiar todos los archivos de la app
           mkdir -p www
           cp index.html app.js style.css manifest.json sw.js www/ 2>/dev/null || true
           cp *.png *.jpg www/ 2>/dev/null || true
           cp -r avatars banners www/ 2>/dev/null || true
-          
-          # Forzar webDir a "www" (más fiable que ".")
+
           if [ -f capacitor.config.json ]; then
             sed -i 's/"webDir": *"[^"]*"/"webDir": "www"/' capacitor.config.json
           else
-            cat > capacitor.config.json << 'EOF'
+            cat > capacitor.config.json << 'EOC'
           {
             "appId": "app.reiny.chat",
             "appName": "Reiny",
             "webDir": "www",
-            "server": {
-              "androidScheme": "https"
-            },
+            "server": { "androidScheme": "https" },
             "plugins": {
               "SplashScreen": {
                 "launchShowDuration": 1200,
@@ -59,10 +55,10 @@ jobs:
               }
             }
           }
-          EOF
+          EOC
           fi
-          
-          echo "=== Contenido de www ==="
+
+          echo "=== www ==="
           ls -la www/
           echo "=== capacitor.config.json ==="
           cat capacitor.config.json
@@ -75,32 +71,28 @@ jobs:
       - name: Add microphone + call permissions
         run: |
           MANIFEST="android/app/src/main/AndroidManifest.xml"
-          
-          # Permiso de micrófono (obligatorio para llamadas)
+
           if ! grep -q "RECORD_AUDIO" "$MANIFEST"; then
             sed -i '/<manifest/a\    <uses-permission android:name="android.permission.RECORD_AUDIO" />' "$MANIFEST"
             echo "RECORD_AUDIO añadido"
           fi
-          
-          # Mejor control de audio
+
           if ! grep -q "MODIFY_AUDIO_SETTINGS" "$MANIFEST"; then
             sed -i '/<manifest/a\    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />' "$MANIFEST"
             echo "MODIFY_AUDIO_SETTINGS añadido"
           fi
-          
-          # Notificaciones (Android 13+)
+
           if ! grep -q "POST_NOTIFICATIONS" "$MANIFEST"; then
             sed -i '/<manifest/a\    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />' "$MANIFEST"
             echo "POST_NOTIFICATIONS añadido"
           fi
-          
-          # Servicio en primer plano (ayuda con llamadas)
+
           if ! grep -q "FOREGROUND_SERVICE" "$MANIFEST"; then
             sed -i '/<manifest/a\    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />' "$MANIFEST"
             echo "FOREGROUND_SERVICE añadido"
           fi
-          
-          echo "=== Permisos actuales ==="
+
+          echo "=== Permisos ==="
           grep "uses-permission" "$MANIFEST" || true
 
       - name: Copy google-services.json
@@ -124,14 +116,12 @@ jobs:
 
       - name: Add Google Services (app) + Firebase
         run: |
-          # Aplicar plugin
           if ! grep -q "com.google.gms.google-services" android/app/build.gradle; then
             echo "" >> android/app/build.gradle
             echo "apply plugin: 'com.google.gms.google-services'" >> android/app/build.gradle
             echo "plugin aplicado"
           fi
-          
-          # Añadir Firebase Messaging (versión estable)
+
           if ! grep -q "firebase-messaging" android/app/build.gradle; then
             sed -i "/dependencies {/a\    implementation platform('com.google.firebase:firebase-bom:33.7.0')\n    implementation 'com.google.firebase:firebase-messaging'" android/app/build.gradle
             echo "Firebase Messaging añadido"
