@@ -27,6 +27,46 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
+      - name: Prepare web assets (www)
+        run: |
+          # Crear carpeta www y copiar todos los archivos de la app
+          mkdir -p www
+          cp index.html app.js style.css manifest.json sw.js www/ 2>/dev/null || true
+          cp *.png *.jpg www/ 2>/dev/null || true
+          cp -r avatars banners www/ 2>/dev/null || true
+          
+          # Forzar webDir a "www" (más fiable que ".")
+          if [ -f capacitor.config.json ]; then
+            sed -i 's/"webDir": *"[^"]*"/"webDir": "www"/' capacitor.config.json
+          else
+            cat > capacitor.config.json << 'EOF'
+          {
+            "appId": "app.reiny.chat",
+            "appName": "Reiny",
+            "webDir": "www",
+            "server": {
+              "androidScheme": "https"
+            },
+            "plugins": {
+              "SplashScreen": {
+                "launchShowDuration": 1200,
+                "backgroundColor": "#EAF4FC",
+                "showSpinner": false
+              },
+              "StatusBar": {
+                "style": "DARK",
+                "backgroundColor": "#5B9FE3"
+              }
+            }
+          }
+          EOF
+          fi
+          
+          echo "=== Contenido de www ==="
+          ls -la www/
+          echo "=== capacitor.config.json ==="
+          cat capacitor.config.json
+
       - name: Add Android platform + sync
         run: |
           npx cap add android
@@ -37,33 +77,33 @@ jobs:
           if [ -f google-services.json ]; then
             mkdir -p android/app
             cp google-services.json android/app/google-services.json
-            echo "google-services.json copiado correctamente"
+            echo "google-services.json copiado"
             python3 -c "import json; d=json.load(open('android/app/google-services.json')); print('package =', d['client'][0]['client_info']['android_client_info']['package_name'])"
           else
-            echo "ERROR: falta google-services.json en la raíz del repo"
+            echo "ERROR: falta google-services.json"
             exit 1
           fi
 
-      - name: Add Google Services plugin (root)
+      - name: Add Google Services (root)
         run: |
           if ! grep -q "com.google.gms:google-services" android/build.gradle; then
             sed -i "/classpath 'com.android.tools.build:gradle/a\        classpath 'com.google.gms:google-services:4.4.2'" android/build.gradle
-            echo "classpath añadido en root build.gradle"
+            echo "classpath añadido"
           fi
 
-      - name: Add Google Services plugin (app)
+      - name: Add Google Services (app) + Firebase
         run: |
+          # Aplicar plugin
           if ! grep -q "com.google.gms.google-services" android/app/build.gradle; then
             echo "" >> android/app/build.gradle
             echo "apply plugin: 'com.google.gms.google-services'" >> android/app/build.gradle
-            echo "plugin aplicado en app/build.gradle"
+            echo "plugin aplicado"
           fi
-
-      - name: Add Firebase Messaging dependency
-        run: |
+          
+          # Añadir Firebase Messaging (versión estable)
           if ! grep -q "firebase-messaging" android/app/build.gradle; then
             sed -i "/dependencies {/a\    implementation platform('com.google.firebase:firebase-bom:33.7.0')\n    implementation 'com.google.firebase:firebase-messaging'" android/app/build.gradle
-            echo "Firebase Messaging añadido (BoM 33.7.0)"
+            echo "Firebase Messaging añadido"
           fi
 
       - name: Copy launcher icons
@@ -74,6 +114,7 @@ jobs:
               cp -f res/mipmap-$dens/ic_launcher.png android/app/src/main/res/mipmap-$dens/ic_launcher.png 2>/dev/null || true
               cp -f res/mipmap-$dens/ic_launcher.png android/app/src/main/res/mipmap-$dens/ic_launcher_round.png 2>/dev/null || true
             done
+            echo "Iconos copiados"
           fi
 
       - name: Build debug APK
