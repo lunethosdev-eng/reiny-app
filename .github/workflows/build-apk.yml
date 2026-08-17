@@ -72,6 +72,37 @@ jobs:
           npx cap add android
           npx cap sync android
 
+      - name: Add microphone + call permissions
+        run: |
+          MANIFEST="android/app/src/main/AndroidManifest.xml"
+          
+          # Permiso de micrófono (obligatorio para llamadas)
+          if ! grep -q "RECORD_AUDIO" "$MANIFEST"; then
+            sed -i '/<manifest/a\    <uses-permission android:name="android.permission.RECORD_AUDIO" />' "$MANIFEST"
+            echo "RECORD_AUDIO añadido"
+          fi
+          
+          # Mejor control de audio
+          if ! grep -q "MODIFY_AUDIO_SETTINGS" "$MANIFEST"; then
+            sed -i '/<manifest/a\    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />' "$MANIFEST"
+            echo "MODIFY_AUDIO_SETTINGS añadido"
+          fi
+          
+          # Notificaciones (Android 13+)
+          if ! grep -q "POST_NOTIFICATIONS" "$MANIFEST"; then
+            sed -i '/<manifest/a\    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />' "$MANIFEST"
+            echo "POST_NOTIFICATIONS añadido"
+          fi
+          
+          # Servicio en primer plano (ayuda con llamadas)
+          if ! grep -q "FOREGROUND_SERVICE" "$MANIFEST"; then
+            sed -i '/<manifest/a\    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />' "$MANIFEST"
+            echo "FOREGROUND_SERVICE añadido"
+          fi
+          
+          echo "=== Permisos actuales ==="
+          grep "uses-permission" "$MANIFEST" || true
+
       - name: Copy google-services.json
         run: |
           if [ -f google-services.json ]; then
