@@ -46,6 +46,21 @@ jobs:
           npx cap sync android
           test -d android
 
+      - name: Set minSdkVersion 23
+        run: |
+          set -e
+          if [ -f android/variables.gradle ]; then
+            sed -i 's/minSdkVersion = [0-9]\+/minSdkVersion = 23/' android/variables.gradle
+            grep minSdk android/variables.gradle || true
+          fi
+          if [ -f android/app/build.gradle ]; then
+            sed -i 's/minSdkVersion [0-9]\+/minSdkVersion 23/' android/app/build.gradle || true
+            grep -n "minSdk" android/app/build.gradle || true
+          fi
+          if [ -f android/build.gradle ]; then
+            sed -i 's/minSdkVersion = [0-9]\+/minSdkVersion = 23/' android/build.gradle || true
+          fi
+
       - name: Inject google-services.json
         env:
           GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
@@ -76,7 +91,7 @@ jobs:
               sed -i "/dependencies {/a\    implementation platform('com.google.firebase:firebase-bom:34.17.0')\n    implementation 'com.google.firebase:firebase-messaging'" android/app/build.gradle || true
             fi
           fi
-          grep -n "google-services\|firebase" android/build.gradle android/app/build.gradle || true
+          grep -n "google-services\|firebase\|minSdk" android/variables.gradle android/build.gradle android/app/build.gradle 2>/dev/null || true
 
       - name: Copy launcher icons
         run: |
