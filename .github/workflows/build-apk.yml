@@ -14,9 +14,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: npm
 
       - name: Install deps
-        run: npm install
+        run: npm ci || npm install
 
       - name: Setup Java
         uses: actions/setup-java@v4
@@ -27,71 +28,49 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Build web folder and Android project
+      - name: Add Android platform + sync
         run: |
-          set -e
-          rm -rf www
-          mkdir -p www
-          cp -f index.html app.js style.css www/
-          cp -f sw.js manifest.json www/ 2>/dev/null || true
-          cp -f icon-192.png icon-512.png icon-48.png www/ 2>/dev/null || true
-          cp -f favicon-32.png favicon-48.png apple-touch-icon.png www/ 2>/dev/null || true
-          cp -a avatars www/ 2>/dev/null || true
-          cp -a banners www/ 2>/dev/null || true
-          ls -la www
-          test -f www/index.html
-          test -f www/app.js
-          rm -rf android
           npx cap add android
           npx cap sync android
-          test -d android
 
-      - name: Set minSdkVersion 23
+      - name: Copy google-services.json
         run: |
-          set -e
-          if [ -f android/variables.gradle ]; then
-            sed -i 's/minSdkVersion = [0-9]\+/minSdkVersion = 23/' android/variables.gradle
-            grep minSdk android/variables.gradle || true
-          fi
-          if [ -f android/app/build.gradle ]; then
-            sed -i 's/minSdkVersion [0-9]\+/minSdkVersion 23/' android/app/build.gradle || true
-            grep -n "minSdk" android/app/build.gradle || true
-          fi
-          if [ -f android/build.gradle ]; then
-            sed -i 's/minSdkVersion = [0-9]\+/minSdkVersion = 23/' android/build.gradle || true
-          fi
-
-      - name: Inject google-services.json
-        env:
-          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
-        run: |
-          mkdir -p android/app
-          if [ -n "$GOOGLE_SERVICES_JSON" ]; then
-            printf '%s\n' "$GOOGLE_SERVICES_JSON" > android/app/google-services.json
-            echo "google-services from secret"
-          elif [ -f google-services.json ]; then
-            cp -f google-services.json android/app/google-services.json
-            echo "google-services from repo"
+          if [ -f google-services.json ]; then
+            mkdir -p android/app
+            cp google-services.json android/app/google-services.json
+            echo "google-services.json copiado correctamente"
+            python3 -c "import json; d=json.load(open('android/app/google-services.json')); print('package =', d['client'][0]['client_info']['android_client_info']['package_name'])"
           else
-            echo "WARNING: no google-services.json"
+            echo "ERROR: falta google-services.json en la raíz del repo"
+            exit 1
           fi
 
-      - name: Enable Google Services plugin
+      # --- Forma limpia de añadir Google Services (sin Python frágil) ---
+      - name: Add Google Services plugin (root)
         run: |
-          set -e
-          if [ -f android/build.gradle ] && ! grep -q 'com.google.gms:google-services' android/build.gradle; then
-            sed -i "/com.android.tools.build:gradle/a\        classpath 'com.google.gms:google-services:4.5.0'" android/build.gradle || true
+          # Añadir classpath de forma segura
+          if ! grep -q "com.google.gms:google-services" android/build.gradle; then
+            sed -i "/classpath 'com.android.tools.build:gradle/a\        classpath 'com.google.gms:google-services:4.4.2'" android/build.gradle
+            echo "classpath añadido en root build.gradle"
           fi
-          if [ -f android/app/build.gradle ]; then
-            if ! grep -q 'com.google.gms.google-services' android/app/build.gradle; then
-              echo "" >> android/app/build.gradle
-              echo "apply plugin: 'com.google.gms.google-services'" >> android/app/build.gradle
-            fi
-            if ! grep -q 'firebase-messaging' android/app/build.gradle; then
-              sed -i "/dependencies {/a\    implementation platform('com.google.firebase:firebase-bom:34.17.0')\n    implementation 'com.google.firebase:firebase-messaging'" android/app/build.gradle || true
-            fi
+
+      - name: Add Google Services plugin (app)
+        run: |
+          # Aplicar el plugin al final del archivo (forma estándar)
+          if ! grep -q "com.google.gms.google-services" android/app/build.gradle; then
+            echo "" >> android/app/build.gradle
+            echo "apply plugin: 'com.google.gms.google-services'" >> android/app/build.gradle
+            echo "plugin aplicado en app/build.gradle"
           fi
-          grep -n "google-services\|firebase\|minSdk" android/variables.gradle android/build.gradle android/app/build.gradle 2>/dev/null || true
+
+      - name: Add Firebase Messaging dependency (versión estable)
+        run: |
+          # Usamos una versión estable compatible con Capacitor 6
+          if ! grep -q "firebase-messaging" android/app/build.gradle; then
+            # Insertar dentro del bloque dependencies
+            sed -i "/dependencies {/a\    implementation platform('com.google.firebase:firebase-bom:33.7.0')\n    implementation 'com.google.firebase:firebase-messaging'" android/app/build.gradle
+            echo "Firebase Messaging añadido (BoM 33.7.0 estable)"
+          fi
 
       - name: Copy launcher icons
         run: |
@@ -105,7 +84,9 @@ jobs:
 
       - name: Build debug APK
         working-directory: android
-        run: chmod +x gradlew && ./gradlew assembleDebug --no-daemon
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon --stacktrace
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
