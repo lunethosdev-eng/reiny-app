@@ -1,7 +1,7 @@
 {
   "appId": "app.reiny.chat",
   "appName": "Reiny",
-  "webDir": ".",
+  "webDir": "www",
   "server": {
     "androidScheme": "https"
   },
@@ -14,6 +14,9 @@
     "StatusBar": {
       "style": "DARK",
       "backgroundColor": "#5B9FE3"
+    },
+    "PushNotifications": {
+      "presentationOptions": ["badge", "sound", "alert"]
     }
   }
 }
