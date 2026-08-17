@@ -13,11 +13,10 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: npm
+          node-version: '22'
 
       - name: Install deps
-        run: npm ci || npm install
+        run: npm install
 
       - name: Setup Java
         uses: actions/setup-java@v4
@@ -45,10 +44,8 @@ jobs:
             exit 1
           fi
 
-      # --- Forma limpia de añadir Google Services (sin Python frágil) ---
       - name: Add Google Services plugin (root)
         run: |
-          # Añadir classpath de forma segura
           if ! grep -q "com.google.gms:google-services" android/build.gradle; then
             sed -i "/classpath 'com.android.tools.build:gradle/a\        classpath 'com.google.gms:google-services:4.4.2'" android/build.gradle
             echo "classpath añadido en root build.gradle"
@@ -56,20 +53,17 @@ jobs:
 
       - name: Add Google Services plugin (app)
         run: |
-          # Aplicar el plugin al final del archivo (forma estándar)
           if ! grep -q "com.google.gms.google-services" android/app/build.gradle; then
             echo "" >> android/app/build.gradle
             echo "apply plugin: 'com.google.gms.google-services'" >> android/app/build.gradle
             echo "plugin aplicado en app/build.gradle"
           fi
 
-      - name: Add Firebase Messaging dependency (versión estable)
+      - name: Add Firebase Messaging dependency
         run: |
-          # Usamos una versión estable compatible con Capacitor 6
           if ! grep -q "firebase-messaging" android/app/build.gradle; then
-            # Insertar dentro del bloque dependencies
             sed -i "/dependencies {/a\    implementation platform('com.google.firebase:firebase-bom:33.7.0')\n    implementation 'com.google.firebase:firebase-messaging'" android/app/build.gradle
-            echo "Firebase Messaging añadido (BoM 33.7.0 estable)"
+            echo "Firebase Messaging añadido (BoM 33.7.0)"
           fi
 
       - name: Copy launcher icons
