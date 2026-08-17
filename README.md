@@ -1,50 +1,48 @@
-# Reiny 🐱
+# 🐱 Reiny — Anuncio Oficial de Lanzamiento
 
-App social: chats, estados, reels, música, perfiles estilo Piko y **Chromo AI** (tsundere).
+¡Nos alegra presentar **Reiny**! La plataforma social todo en uno diseñada para conectar, compartir y disfrutar de una experiencia digital completa, fluida e interactiva.
 
-Icono oficial: gato pixel (`icon-512.png`).
+---
 
-## Abrir en el navegador
+## 🚨 AVISO CRÍTICO DE ACTUALIZACIÓN (LEER ANTES DE INSTALAR)
 
-Sirve la carpeta con cualquier static server, por ejemplo:
+> ⚠️ **ATENCIÓN A TODOS LOS USUARIOS:**
+> Para garantizar el funcionamiento correcto de las nuevas funciones y evitar errores del sistema, **ES OBLIGATORIO DESINSTALAR CUALQUIER VERSIÓN ANTERIOR DE REINY** antes de proceder con la instalación de la nueva APK.
+> 
+> **¿Por qué ocurre esto?**  
+> Debido a un conflicto técnico conocido con los servicios de Google (Google Play Services / caché persistente de WebView), mantener dos versiones o actualizar sobre la versión antigua puede causar bucles de inicio de sesión, cierres inesperados y problemas de sincronización en tiempo real.
 
-```bash
-npx serve .
-# o
-python3 -m http.server 7700
-```
+---
 
-## Mencionar a Chromo
+## ✨ ¿Qué es Reiny?
 
-En cualquier chat escribe:
+**Reiny** combina lo mejor de las redes sociales en una sola aplicación moderna y ligera:
+
+- 💬 **Mensajería en Tiempo Real:** Chat rápido, privado e interactivo.
+- 📞 **Llamadas de Voz WebRTC:** Audio de alta definición en tiempo real, interfaz *Liquid Glass* y gestión en segundo plano.
+- 📸 **Estados y Reels:** Expresa tu día a día con contenido en foto, texto y formato vertical.
+- 🎵 **Música:** Integra y escucha tus pistas favoritas dentro de la app.
+- 👤 **Perfiles Estilo Piko:** Personalización de perfil única para destacar tu estilo.
+- 🤖 **Chromo AI:** Asistente inteligente integrado con personalidad *tsundere* listo para interactuar en tus chats con la mención `@chromo`.
+
+---
+
+## 🚀 Novedades de la Versión Reciente (v0.2.4)
+
+- 📞 **Botón de Llamada:** Acceso directo desde cualquier conversación.
+- ✨ **Diseño Liquid Glass:** Nueva pantalla visualmente mejorada para llamadas activas.
+- 📲 **Llamadas Entrantes:** Interfaz clara e intuitiva para aceptar/rechazar llamadas.
+- 🔔 **Notificaciones Push (FCM):** Notificaciones y alertas sonoras activas incluso fuera de la app.
+- 🎙️ **Tecnología WebRTC:** Conexión de audio punto a punto optimizada entre dispositivos.
+- 📱 **Soporte Multi-tarea:** Gestión fluida de llamadas en segundo plano.
+- 🔙 **Integración Android:** Control total con el botón físico/gestual de navegación "Atrás".
+
+---
+
+## 🤖 Uso de Chromo AI
+
+Interactúa con la IA en cualquier sala de chat utilizando la mención directa:
 
 ```text
 @chromo ayuda
-@chromo cómo subo un estado?
-```
-
-## Generar APK
-
-Lee **[APK.md](./APK.md)** — tres formas:
-
-1. **GitHub Actions** (Actions → Build Android APK)
-2. **Android Studio** + Capacitor
-3. **PWA Builder** online
-
-### Capacitor (resumen)
-
-```bash
-npm install
-npx cap add android
-npx cap sync
-npx cap open android
-```
-
-## Supabase
-
-Configura tu proyecto y ejecuta `supabase-schema.sql` / `SQL-ESTADOS-COMPLETO.sql`.
-
-## Seguridad
-
-La API key de OpenRouter vive en `app.js` (cliente).  
-**Mantén el repo privado** o muévela a un backend antes de hacerlo público.
+@chromo ¿cómo subo un estado?
