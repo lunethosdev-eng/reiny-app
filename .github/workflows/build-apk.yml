@@ -27,77 +27,56 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Prepare webDir (www)
+      - name: Build web folder and Android project
         run: |
+          set -e
           rm -rf www
           mkdir -p www
-          for f in index.html app.js style.css sw.js manifest.json \
-                   icon-192.png icon-512.png icon-48.png \
-                   favicon-32.png favicon-48.png apple-touch-icon.png; do
-            if [ -f "$f" ]; then cp -f "$f" www/; fi
-          done
-          if [ -d avatars ]; then cp -a avatars www/; fi
-          if [ -d banners ]; then cp -a banners www/; fi
-          test -f www/index.html || (echo "FALTA index.html en www" && exit 1)
-          echo "www listo:" && ls -la www
-
-      - name: Add Android platform and sync
-        run: |
-          if [ ! -d android ]; then
-            npx cap add android
-          fi
+          cp -f index.html app.js style.css www/
+          cp -f sw.js manifest.json www/ 2>/dev/null || true
+          cp -f icon-192.png icon-512.png icon-48.png www/ 2>/dev/null || true
+          cp -f favicon-32.png favicon-48.png apple-touch-icon.png www/ 2>/dev/null || true
+          cp -a avatars www/ 2>/dev/null || true
+          cp -a banners www/ 2>/dev/null || true
+          ls -la www
+          test -f www/index.html
+          test -f www/app.js
+          rm -rf android
+          npx cap add android
           npx cap sync android
+          test -d android
 
-      - name: Inject google-services.json (FCM)
+      - name: Inject google-services.json
         env:
           GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
         run: |
           mkdir -p android/app
           if [ -n "$GOOGLE_SERVICES_JSON" ]; then
             printf '%s\n' "$GOOGLE_SERVICES_JSON" > android/app/google-services.json
-            echo "OK: google-services.json desde secret"
+            echo "google-services from secret"
           elif [ -f google-services.json ]; then
-            cp google-services.json android/app/google-services.json
-            echo "OK: google-services.json desde repo"
+            cp -f google-services.json android/app/google-services.json
+            echo "google-services from repo"
           else
-            echo "AVISO: sin google-services.json"
+            echo "WARNING: no google-services.json"
           fi
 
-      - name: Wire Google Services Gradle plugin
+      - name: Enable Google Services plugin
         run: |
+          set -e
           if [ -f android/build.gradle ] && ! grep -q 'com.google.gms:google-services' android/build.gradle; then
-            python3 -c "
-          from pathlib import Path
-          p=Path('android/build.gradle')
-          lines=p.read_text().splitlines()
-          out=[]
-          done=False
-          for line in lines:
-              out.append(line)
-              if (not done) and 'classpath' in line and 'com.android.tools.build:gradle' in line:
-                  out.append(\"        classpath 'com.google.gms:google-services:4.5.0'\")
-                  done=True
-          p.write_text(chr(10).join(out)+chr(10))
-          print('classpath', 'ok' if done else 'skip')
-          "
+            sed -i "/com.android.tools.build:gradle/a\        classpath 'com.google.gms:google-services:4.5.0'" android/build.gradle || true
           fi
           if [ -f android/app/build.gradle ]; then
             if ! grep -q 'com.google.gms.google-services' android/app/build.gradle; then
               echo "" >> android/app/build.gradle
               echo "apply plugin: 'com.google.gms.google-services'" >> android/app/build.gradle
             fi
-            if ! grep -q 'firebase-bom' android/app/build.gradle; then
-              python3 -c "
-          from pathlib import Path
-          p=Path('android/app/build.gradle')
-          t=p.read_text()
-          if 'firebase-bom' not in t and 'dependencies {' in t:
-              t=t.replace('dependencies {', \"dependencies {\\n    implementation platform('com.google.firebase:firebase-bom:34.17.0')\\n    implementation 'com.google.firebase:firebase-messaging'\", 1)
-              p.write_text(t)
-              print('firebase deps ok')
-          "
+            if ! grep -q 'firebase-messaging' android/app/build.gradle; then
+              sed -i "/dependencies {/a\    implementation platform('com.google.firebase:firebase-bom:34.17.0')\n    implementation 'com.google.firebase:firebase-messaging'" android/app/build.gradle || true
             fi
           fi
+          grep -n "google-services\|firebase" android/build.gradle android/app/build.gradle || true
 
       - name: Copy launcher icons
         run: |
